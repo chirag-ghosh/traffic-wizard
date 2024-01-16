@@ -45,3 +45,19 @@ func (hm *ConsistentHashMap) GetServerForRequest(requestID int) int {
 	}
 	return hm.virtualServers[slot]
 }
+
+func (hm *ConsistentHashMap) RemoveServer(serverID int) {
+    for j := 0; j < K; j++ {
+        virtualServerHash := hashVirtualServer(serverID, j)
+        slot := virtualServerHash % Slots
+        if hm.virtualServers[slot] == serverID {
+            hm.virtualServers[slot] = -1
+
+            nextSlot := (slot + 1) % Slots
+            for hm.virtualServers[nextSlot] == serverID {
+                hm.virtualServers[nextSlot] = -1
+                nextSlot = (nextSlot + 1) % Slots
+            }
+        }
+    }
+}
