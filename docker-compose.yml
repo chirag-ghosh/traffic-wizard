@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  loadbalancer:
+    build: "./loadbalancer"
+    image: traffic-wizard-lb
+    ports:
+      - "5000:5000"
+    networks:
+      - traffic-wizard-network
+
+networks:
+  traffic-wizard-network:
+    driver: bridge
