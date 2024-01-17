@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"math/rand"
+	"net/http"
 	"time"
-	"hash/fnv"
-	"io"
-	"./internal/consistenthashmap"
+
+	"github.com/chirag-ghosh/traffic-wizard/loadbalancer/internal/consistenthashmap"
 )
 
 type ServerInfo struct {
@@ -47,15 +46,14 @@ func getReplicaStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func getNextServerID() int {
-    maxID := 0
-    for id := range servers {
-        if id > maxID {
-            maxID = id
-        }
-    }
-    return maxID + 1
+	maxID := 0
+	for id := range servers {
+		if id > maxID {
+			maxID = id
+		}
+	}
+	return maxID + 1
 }
-
 
 type AddServersPayload struct {
 	N         int      `json:"n"`
@@ -102,7 +100,7 @@ func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	for i, hostname := range payload.Hostnames {
 		serverID := getNextServerID()
-		chm.AddServer(serverID) 
+		chm.AddServer(serverID)
 
 		// The logic to actually spawn the server instances should be here.
 		// spawnNewServerInstance(hostname)
@@ -116,41 +114,41 @@ func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	resp := AddServersResponse{
 		Message: map[string]interface{}{
-			"N":        len(servers), 
-			"replicas": getReplicas(), 
+			"N":        len(servers),
+			"replicas": getReplicas(),
 		},
 		Status: "successful",
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(resp)
-}	
+}
 
 type RemoveServersPayload struct {
-    N         int      `json:"n"`
-    Hostnames []string `json:"hostnames"`
+	N         int      `json:"n"`
+	Hostnames []string `json:"hostnames"`
 }
 
 type RemoveServersResponse struct {
-    Message map[string]interface{} `json:"message"`
-    Status  string                 `json:"status"`
+	Message map[string]interface{} `json:"message"`
+	Status  string                 `json:"status"`
 }
 
 func chooseRandomServer() string {
-    rand.Seed(time.Now().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 
-    keys := make([]int, 0, len(servers))
-    for key := range servers {
-        keys = append(keys, key)
-    }
+	keys := make([]int, 0, len(servers))
+	for key := range servers {
+		keys = append(keys, key)
+	}
 
-    if len(keys) == 0 {
-        return "" 
-    }
+	if len(keys) == 0 {
+		return ""
+	}
 
-    randomServerID := keys[rand.Intn(len(keys))]
+	randomServerID := keys[rand.Intn(len(keys))]
 
-    return servers[randomServerID].Hostname
+	return servers[randomServerID].Hostname
 }
 
 func removeServerInstance(hostname string) {
@@ -168,59 +166,59 @@ func removeServerInstance(hostname string) {
 }
 
 func removeServersEndpoint(w http.ResponseWriter, r *http.Request) {
-    if r.Method != http.MethodDelete {
-        http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
-        return
-    }
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
+		return
+	}
 
-    var payload RemoveServersPayload
-    err := json.NewDecoder(r.Body).Decode(&payload)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusBadRequest)
-        return
-    }
+	var payload RemoveServersPayload
+	err := json.NewDecoder(r.Body).Decode(&payload)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
-    if len(payload.Hostnames) > payload.N {
-        resp := RemoveServersResponse{
-            Message: map[string]interface{}{"<Error>": "Length of hostname list is more than removable instances"},
-            Status:  "failure",
-        }
-        w.Header().Set("Content-Type", "application/json")
-        w.WriteHeader(http.StatusBadRequest)
-        json.NewEncoder(w).Encode(resp)
-        return
-    }
+	if len(payload.Hostnames) > payload.N {
+		resp := RemoveServersResponse{
+			Message: map[string]interface{}{"<Error>": "Length of hostname list is more than removable instances"},
+			Status:  "failure",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(resp)
+		return
+	}
 
-    for _, hostname := range payload.Hostnames {
-        removeServerInstance(hostname)
-    }
+	for _, hostname := range payload.Hostnames {
+		removeServerInstance(hostname)
+	}
 
-    for len(payload.Hostnames) < payload.N {
-        hostname := chooseRandomServer()
-        removeServerInstance(hostname)
-        payload.Hostnames = append(payload.Hostnames, hostname)
-    }
+	for len(payload.Hostnames) < payload.N {
+		hostname := chooseRandomServer()
+		removeServerInstance(hostname)
+		payload.Hostnames = append(payload.Hostnames, hostname)
+	}
 
-    resp := RemoveServersResponse{
-        Message: map[string]interface{}{
-            "N":        len(servers), 
-            "replicas": getReplicas(), 
-        },
-        Status: "successful",
-    }
+	resp := RemoveServersResponse{
+		Message: map[string]interface{}{
+			"N":        len(servers),
+			"replicas": getReplicas(),
+		},
+		Status: "successful",
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(resp)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
 
 func responseError(w http.ResponseWriter, message string, statusCode int) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(statusCode)
-    json.NewEncoder(w).Encode(map[string]string{
-        "message": message,
-        "status":  "failure",
-    })
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": message,
+		"status":  "failure",
+	})
 }
 
 // todo
@@ -261,4 +259,3 @@ func main() {
 		log.Fatalf("Failed to start load balancer: %v", err)
 	}
 }
-
