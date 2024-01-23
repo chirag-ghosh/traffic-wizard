@@ -3,13 +3,51 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
+	"os/exec"
 	"time"
 
+	// "path/filepath"
 	"github.com/chirag-ghosh/traffic-wizard/loadbalancer/internal/consistenthashmap"
 )
+
+func spawnNewServerInstance(hostname string, id int) {
+
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("Current working directory:", dir)
+
+	cmd := exec.Command("sudo", "docker", "build", "--tag", "traffic-wizard-server", "/server")
+	err = cmd.Run()
+	if err != nil {
+		log.Fatalf("Failed to build server image: %v", err)
+	}
+
+	// Run the server Docker container
+	cmd = exec.Command("sudo", "docker", "run", "-d", "--name", hostname, "-e", fmt.Sprintf("ID=%d", id), "traffic-wizard-server:latest")
+
+	// cmd = exec.Command("docker", "run", "-d", "--name", hostname, "traffic-wizard-server:latest")
+	err = cmd.Run()
+	if err != nil {
+		log.Fatalf("Failed to start new server instance: %v", err)
+	}
+}
+
+func hashRequest(path string) int {
+	h := fnv.New32a()
+	_, err := h.Write([]byte(path))
+	if err != nil {
+		return 0
+	}
+	return int(h.Sum32())
+}
 
 type ServerInfo struct {
 	ID       int
@@ -75,7 +113,7 @@ func getReplicas() []string {
 
 func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
+		http.Error(w, "Method is not supported", http.StatusNotFound)
 		return
 	}
 
@@ -103,7 +141,7 @@ func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 		chm.AddServer(serverID)
 
 		// The logic to actually spawn the server instances should be here.
-		// spawnNewServerInstance(hostname)
+		spawnNewServerInstance(hostname, serverID)
 
 		servers[serverID] = ServerInfo{ID: serverID, Hostname: hostname}
 
@@ -222,37 +260,47 @@ func responseError(w http.ResponseWriter, message string, statusCode int) {
 }
 
 // todo
-/*
+
 func routeRequest(w http.ResponseWriter, r *http.Request) {
-    path := r.URL.Path
+	path := r.URL.Path
 
-    requestID := hashRequest(path)
-    serverID := chm.GetServerForRequest(requestID)
+	requestID := hashRequest(path)
+	serverID := chm.GetServerForRequest(requestID)
 
-    server, exists := servers[serverID]
-    if !exists {
-        responseError(w, "<Error> Server not found", http.StatusNotFound)
-        return
-    }
+	server, exists := servers[serverID]
+	if !exists {
+		responseError(w, "<Error> Server not found", http.StatusNotFound)
+		return
+	}
 
-    resp, err := http.Get(server.Hostname + path)
-    if err != nil {
-        responseError(w, fmt.Sprintf("<Error> %s endpoint does not exist in server replicas", path), http.StatusBadRequest)
-        return
-    }
-    defer resp.Body.Close()
+	resp, err := http.Get("http://" + server.Hostname + path)
+	if err != nil {
+		http.Error(w, "Error forwarding request: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
 
-    w.WriteHeader(resp.StatusCode)
-    io.Copy(w, resp.Body)
+	if resp.StatusCode == http.StatusNotFound {
+		http.Error(w, "<Error> '"+path+"' endpoint does not exist in server replicas", http.StatusBadRequest)
+		return
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Error reading response body: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
 }
-
-*/
 
 func main() {
 	http.HandleFunc("/rep", getReplicaStatus)
 	http.HandleFunc("/add", addServersEndpoint)
 	http.HandleFunc("/rm", removeServersEndpoint)
-	// http.HandleFunc("/", routeRequest)
+	http.HandleFunc("/", routeRequest)
 
 	fmt.Println("Load Balancer started on port 5000")
 	if err := http.ListenAndServe(":5000", nil); err != nil {

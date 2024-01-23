@@ -3,9 +3,13 @@ version: "3"
 services:
   loadbalancer:
     build: "./loadbalancer"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./server:/server
     image: traffic-wizard-lb
     ports:
       - "5000:5000"
+    privileged: true
     networks:
       - traffic-wizard-network
 
