@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
-	"time"
-	"io/ioutil"
-	"hash/fnv"
-	"os/exec"
 	"os"
+	"os/exec"
+	"time"
+
 	// "path/filepath"
 	"github.com/chirag-ghosh/traffic-wizard/loadbalancer/internal/consistenthashmap"
 )
@@ -23,14 +24,14 @@ func spawnNewServerInstance(hostname string, id int) {
 	}
 	fmt.Println("Current working directory:", dir)
 
-	cmd := exec.Command("docker", "build", "--tag", "traffic-wizard-server", "/server")
+	cmd := exec.Command("sudo", "docker", "build", "--tag", "traffic-wizard-server", "/server")
 	err = cmd.Run()
 	if err != nil {
 		log.Fatalf("Failed to build server image: %v", err)
 	}
 
 	// Run the server Docker container
-    cmd = exec.Command("docker", "run", "-d", "--name", hostname, "-e", fmt.Sprintf("ID=%d", id), "traffic-wizard-server:latest")
+	cmd = exec.Command("sudo", "docker", "run", "-d", "--name", hostname, "-e", fmt.Sprintf("ID=%d", id), "traffic-wizard-server:latest")
 
 	// cmd = exec.Command("docker", "run", "-d", "--name", hostname, "traffic-wizard-server:latest")
 	err = cmd.Run()
@@ -38,7 +39,6 @@ func spawnNewServerInstance(hostname string, id int) {
 		log.Fatalf("Failed to start new server instance: %v", err)
 	}
 }
-
 
 func hashRequest(path string) int {
 	h := fnv.New32a()
@@ -48,7 +48,6 @@ func hashRequest(path string) int {
 	}
 	return int(h.Sum32())
 }
-
 
 type ServerInfo struct {
 	ID       int
@@ -114,7 +113,7 @@ func getReplicas() []string {
 
 func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
+		http.Error(w, "Method is not supported", http.StatusNotFound)
 		return
 	}
 
@@ -263,40 +262,39 @@ func responseError(w http.ResponseWriter, message string, statusCode int) {
 // todo
 
 func routeRequest(w http.ResponseWriter, r *http.Request) {
-    path := r.URL.Path
+	path := r.URL.Path
 
-    requestID := hashRequest(path)
-    serverID := chm.GetServerForRequest(requestID)
+	requestID := hashRequest(path)
+	serverID := chm.GetServerForRequest(requestID)
 
-    server, exists := servers[serverID]
-    if !exists {
-        responseError(w, "<Error> Server not found", http.StatusNotFound)
-        return
-    }
+	server, exists := servers[serverID]
+	if !exists {
+		responseError(w, "<Error> Server not found", http.StatusNotFound)
+		return
+	}
 
-    resp, err := http.Get("http://" + server.Hostname + path)
-    if err != nil {
-        http.Error(w, "Error forwarding request: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
-    defer resp.Body.Close()
-	
+	resp, err := http.Get("http://" + server.Hostname + path)
+	if err != nil {
+		http.Error(w, "Error forwarding request: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode == http.StatusNotFound {
-        http.Error(w, "<Error> '"+path+"' endpoint does not exist in server replicas", http.StatusBadRequest)
-        return
-    }
+		http.Error(w, "<Error> '"+path+"' endpoint does not exist in server replicas", http.StatusBadRequest)
+		return
+	}
 
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        http.Error(w, "Error reading response body: "+err.Error(), http.StatusInternalServerError)
-        return
-    }
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Error reading response body: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    w.Write(body)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body)
 }
-
 
 func main() {
 	http.HandleFunc("/rep", getReplicaStatus)
