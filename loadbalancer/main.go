@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -37,13 +36,9 @@ func spawnNewServerInstance(hostname string, id int) {
 	}
 }
 
-func hashRequest(path string) int {
-	h := fnv.New32a()
-	_, err := h.Write([]byte(path))
-	if err != nil {
-		return 0
-	}
-	return int(h.Sum32())
+func getRequestID() int {
+	rand.Seed(time.Now().UnixNano())
+    return rand.Intn(900000) + 100000
 }
 
 type ServerInfo struct {
@@ -56,9 +51,6 @@ var servers = make(map[int]ServerInfo)
 
 func init() {
 	chm.Init()
-	// Initialize your server instances here with actual IDs and hostnames
-	// servers[1] = ServerInfo{ID: 1, Hostname: "server-1-hostname"}
-	// ... add other servers
 }
 
 func getReplicaStatus(w http.ResponseWriter, r *http.Request) {
@@ -279,7 +271,7 @@ func getServerIP(hostname string) string {
 func routeRequest(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
 
-	requestID := hashRequest(path)
+	requestID := getRequestID()
 	serverID := chm.GetServerForRequest(requestID)
 
 	server, exists := servers[serverID]
