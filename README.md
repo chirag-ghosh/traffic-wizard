@@ -119,14 +119,14 @@ The load balancer demonstrates basic scalability by effectively distributing req
 
 
 
-Analysis 3:
+# Analysis 3:
 
 
 we manually ran `docker stop <server-hostname>` to simulate a server failure. The load balancer was able to spawn a new server instance and handle the load within 5-6 seconds.
 
 
 
-Analysis 4:
+# Analysis 4:
 # Load Balancer Hash Function Update Analysis
 
 ## Overview
