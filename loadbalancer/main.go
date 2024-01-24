@@ -126,10 +126,20 @@ func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for i, hostname := range payload.Hostnames {
+		flag := true
+		for _, serverInfo := range servers {
+			if serverInfo.Hostname == hostname {
+				fmt.Printf("Hostname: '%s' already present", hostname)
+				flag = false
+				break
+			}
+		}
+		if flag == false {
+			continue
+		}
 		serverID := getNextServerID()
 		chm.AddServer(serverID)
 
-		// The logic to actually spawn the server instances should be here.
 		spawnNewServerInstance(hostname, serverID)
 
 		servers[serverID] = ServerInfo{ID: serverID, Hostname: hostname}
@@ -137,6 +147,17 @@ func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 		if i+1 == payload.N {
 			break
 		}
+	}
+
+	for temp := len(payload.Hostnames); temp < payload.N; temp++ {
+		serverID := getNextServerID()
+		hostname := fmt.Sprintf("autohost-%d", serverID)
+
+		chm.AddServer(serverID)
+
+		spawnNewServerInstance(hostname, serverID)
+
+		servers[serverID] = ServerInfo{ID: serverID, Hostname: hostname}
 	}
 
 	resp := AddServersResponse{
@@ -179,6 +200,18 @@ func chooseRandomServer() string {
 }
 
 func removeServerInstance(hostname string) {
+	flag := false
+	for _, serverInfo := range servers {
+		if serverInfo.Hostname == hostname {
+			fmt.Printf("Hostname: '%s' not present", hostname)
+			flag = true
+			break
+		}
+	}
+	if flag == false {
+		return
+	}
+
 	cmd := exec.Command("sudo", "docker", "stop", hostname)
 	err := cmd.Run()
 	if err != nil {
@@ -201,6 +234,7 @@ func removeServerInstance(hostname string) {
 	delete(servers, serverID)
 	chm.RemoveServer(serverID)
 }
+
 func removeServersEndpoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
