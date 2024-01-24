@@ -20,6 +20,7 @@ import (
 const ServerDockerImageName = "traffix-wizard-server"
 const DockerNetworkName = "traffic-wizard-network"
 const ServerPort = 3002
+const N = 3
 
 func spawnNewServerInstance(hostname string, id int) {
 	cmd := exec.Command("sudo", "docker", "build", "--tag", ServerDockerImageName, "/server")
@@ -100,6 +101,19 @@ func getReplicas() []string {
 	return replicas
 }
 
+func addRandomServers(n int) {
+	for temp := 1; temp <= n; temp++ {
+		serverID := getNextServerID()
+		hostname := fmt.Sprintf("autohost-%d", serverID)
+
+		chm.AddServer(serverID)
+
+		spawnNewServerInstance(hostname, serverID)
+
+		servers[serverID] = ServerInfo{ID: serverID, Hostname: hostname}
+	}
+}
+
 func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method is not supported", http.StatusNotFound)
@@ -149,16 +163,7 @@ func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	for temp := len(payload.Hostnames); temp < payload.N; temp++ {
-		serverID := getNextServerID()
-		hostname := fmt.Sprintf("autohost-%d", serverID)
-
-		chm.AddServer(serverID)
-
-		spawnNewServerInstance(hostname, serverID)
-
-		servers[serverID] = ServerInfo{ID: serverID, Hostname: hostname}
-	}
+	addRandomServers(payload.N - len(payload.Hostnames))
 
 	resp := AddServersResponse{
 		Message: map[string]interface{}{
@@ -368,11 +373,18 @@ func main() {
 	}()
 
 	http.HandleFunc("/rep", getReplicaStatus)
+
 	http.HandleFunc("/add", addServersEndpoint)
 	http.HandleFunc("/rm", removeServersEndpoint)
 	http.HandleFunc("/", routeRequest)
 
+	if N > 0 {
+		fmt.Println("Spawning initial servers")
+		addRandomServers(N)
+		fmt.Println("Spawned ", N, " server replicas")
+	}
 	fmt.Println("Load Balancer started on port 3002")
+
 	if err := http.ListenAndServe(":3002", nil); err != nil {
 		log.Fatalf("Failed to start load balancer: %v", err)
 	}

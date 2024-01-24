@@ -20,3 +20,14 @@ To run the loadbalancer:
 1. Go to `loadbalancer` folder.
 2. Run `docker build --tag traffic-wizard-lb .` to build the docker image
 3. Run `docker run -p 3002:3002 traffic-wizard-lb:latest` to run the docker container.
+
+
+For A4 :
+Hash function used is
+func hashRequest(i int) int {
+	return i
+}
+
+func hashVirtualServer(i, j int) int {
+	return i*i + j*j + 2*j + 25
+}

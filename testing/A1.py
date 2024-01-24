@@ -13,7 +13,7 @@ async def main():
     tasks = []
 
     async with aiohttp.ClientSession() as session:
-        for _ in range(10):  # 10,000 requests
+        for _ in range(10000):  # 10,000 requests
             task = asyncio.ensure_future(fetch(session, url))
             tasks.append(task)
 

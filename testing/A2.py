@@ -21,7 +21,7 @@ async def main():
 
             tasks = [
                 asyncio.ensure_future(fetch(session, "http://localhost:3002/home"))
-                for _ in range(100)  # Test with 10,000 requests
+                for _ in range(10000)  # Test with 10,000 requests
             ]
             responses = await asyncio.gather(*tasks)
 
