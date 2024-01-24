@@ -31,7 +31,6 @@ func spawnNewServerInstance(hostname string, id int) {
 
 	// Run the server Docker container
 	cmd = exec.Command("sudo", "docker", "run", "-d", "--name", hostname, "--network", DockerNetworkName, "-e", fmt.Sprintf("id=%d", id), fmt.Sprintf("%s:latest", ServerDockerImageName))
-	fmt.Println(cmd)
 	err = cmd.Run()
 	if err != nil {
 		log.Fatalf("Failed to start new server instance: %v", err)
