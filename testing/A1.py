@@ -34,7 +34,7 @@ async def main():
         plt.xlabel("Servers")
         plt.ylabel("Number of Requests Handled")
         plt.title("Load Distribution Among Servers")
-        plt.savefig("/images/testing.png")
+        plt.savefig("/images/A1.png")
 
 
 # Run the async main function
