@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,23 +20,17 @@ import (
 
 const ServerDockerImageName = "traffix-wizard-server"
 const DockerNetworkName = "traffic-wizard-network"
+const ServerPort = 5000
 
 func spawnNewServerInstance(hostname string, id int) {
-
-	dir, err := os.Getwd()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("Current working directory:", dir)
-
 	cmd := exec.Command("sudo", "docker", "build", "--tag", ServerDockerImageName, "/server")
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		log.Fatalf("Failed to build server image: %v", err)
 	}
 
 	// Run the server Docker container
-	cmd = exec.Command("sudo", "docker", "run", "-d", "--name", hostname, "--network", DockerNetworkName, "-e", fmt.Sprintf("ID=%d", id), fmt.Sprintf("%s:latest", ServerDockerImageName))
+	cmd = exec.Command("sudo", "docker", "run", "-d", "--name", hostname, "--network", DockerNetworkName, "-e", fmt.Sprintf("id=%d", id), fmt.Sprintf("%s:latest", ServerDockerImageName))
 	fmt.Println(cmd)
 	err = cmd.Run()
 	if err != nil {
@@ -271,7 +266,16 @@ func responseError(w http.ResponseWriter, message string, statusCode int) {
 	})
 }
 
-// todo
+func getServerIP(hostname string) string {
+	cmd := exec.Command("sudo", "docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", hostname)
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("Error running docker inspect: %v\n", err)
+		return ""
+	}
+
+	return strings.TrimSpace(string(output))
+}
 
 func routeRequest(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
@@ -285,7 +289,7 @@ func routeRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := http.Get("http://" + server.Hostname + path)
+	resp, err := http.Get("http://" + getServerIP(server.Hostname) + ":" + fmt.Sprint(ServerPort) + path)
 	if err != nil {
 		http.Error(w, "Error forwarding request: "+err.Error(), http.StatusInternalServerError)
 		return
