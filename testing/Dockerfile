@@ -6,4 +6,6 @@ COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python", "./testclient.py"]
+EXPOSE 3002
+
+CMD ["python", "./A1.py"]

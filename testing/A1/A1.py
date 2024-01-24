@@ -9,11 +9,11 @@ async def fetch(session, url):
 
 
 async def main():
-    url = "http://localhost:5000/home"  # Load balancer URL
+    url = "http://localhost:3002/home"  # Load balancer URL
     tasks = []
 
     async with aiohttp.ClientSession() as session:
-        for _ in range(10000):  # 10,000 requests
+        for _ in range(10):  # 10,000 requests
             task = asyncio.ensure_future(fetch(session, url))
             tasks.append(task)
 
@@ -27,6 +27,8 @@ async def main():
         # Plotting the results
         servers = list(server_count.keys())
         counts = list(server_count.values())
+        print(servers)
+        print(counts)
 
         plt.bar(servers, counts)
         plt.xlabel("Servers")

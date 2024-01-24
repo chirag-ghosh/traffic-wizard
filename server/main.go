@@ -32,8 +32,8 @@ func main() {
 	http.HandleFunc("/home", homeEndpoint)
 	http.HandleFunc("/heartbeat", heartbeatEndpoint)
 
-	fmt.Println("Starting server on port 5000")
-	err := http.ListenAndServe(":5000", nil)
+	fmt.Println("Starting server on port 3002")
+	err := http.ListenAndServe(":3002", nil)
 	if errors.Is(err, http.ErrServerClosed) {
 		fmt.Printf("server closed\n")
 	} else if err != nil {

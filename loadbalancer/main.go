@@ -19,7 +19,7 @@ import (
 
 const ServerDockerImageName = "traffix-wizard-server"
 const DockerNetworkName = "traffic-wizard-network"
-const ServerPort = 5000
+const ServerPort = 3002
 
 func spawnNewServerInstance(hostname string, id int) {
 	cmd := exec.Command("sudo", "docker", "build", "--tag", ServerDockerImageName, "/server")
@@ -310,6 +310,7 @@ func routeRequest(w http.ResponseWriter, r *http.Request) {
 
 	server, exists := servers[serverID]
 	if !exists {
+		fmt.Println(serverID, servers)
 		responseError(w, "<Error> Server not found", http.StatusNotFound)
 		return
 	}
@@ -371,8 +372,8 @@ func main() {
 	http.HandleFunc("/rm", removeServersEndpoint)
 	http.HandleFunc("/", routeRequest)
 
-	fmt.Println("Load Balancer started on port 5000")
-	if err := http.ListenAndServe(":5000", nil); err != nil {
+	fmt.Println("Load Balancer started on port 3002")
+	if err := http.ListenAndServe(":3002", nil); err != nil {
 		log.Fatalf("Failed to start load balancer: %v", err)
 	}
 

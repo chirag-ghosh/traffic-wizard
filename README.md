@@ -13,10 +13,10 @@ To run the server:
 
 1. Go to `server` folder.
 2. Run `docker build --tag traffic-wizard-server .` to build the docker image
-3. Run `docker run -e id=1 -p 5000:5000 traffic-wizard-server:latest` to run the docker container. You can set the id as you wish.
+3. Run `docker run -e id=1 -p 3002:3002 traffic-wizard-server:latest` to run the docker container. You can set the id as you wish.
 
 To run the loadbalancer:
 
 1. Go to `loadbalancer` folder.
 2. Run `docker build --tag traffic-wizard-lb .` to build the docker image
-3. Run `docker run -p 5000:5000 traffic-wizard-lb:latest` to run the docker container.
+3. Run `docker run -p 3002:3002 traffic-wizard-lb:latest` to run the docker container.
