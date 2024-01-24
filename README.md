@@ -6,6 +6,7 @@
 
 1. Ensure that you have `make`, `docker` and `docker-compose` installed.
 2. In the project root folder, run `make`
+3. To stop the containers, run `make stop`
 
 
 ---
