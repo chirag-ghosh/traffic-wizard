@@ -11,8 +11,8 @@ import (
 	"os"
 	"os/exec"
 	"time"
-
-	// "path/filepath"
+	"os/signal"
+    	"syscall"
 	"github.com/chirag-ghosh/traffic-wizard/loadbalancer/internal/consistenthashmap"
 )
 
@@ -305,7 +305,35 @@ func routeRequest(w http.ResponseWriter, r *http.Request) {
 	w.Write(body)
 }
 
+// cleanupServers stops and removes all server containers
+func cleanupServers() {
+    fmt.Println("Cleaning up server instances...")
+    for _, server := range servers {
+        stopCmd := exec.Command("sudo", "docker", "stop", server.Hostname)
+        removeCmd := exec.Command("sudo", "docker", "rm", server.Hostname)
+
+        if err := stopCmd.Run(); err != nil {
+            fmt.Println("Failed to stop server '%s': %v", server.Hostname, err)
+        }
+        if err := removeCmd.Run(); err != nil {
+            fmt.Println("Failed to remove server '%s': %v", server.Hostname, err)
+        }
+    }
+}
+
 func main() {
+	// a channel to listen to OS signal - ctrl+C to exit
+    sigs := make(chan os.Signal, 1)
+    cleanupDone := make(chan bool)
+
+    signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+
+    go func() {
+        <-sigs // termination signal
+        cleanupServers() 
+        cleanupDone <- true // Signal that cleanup is done
+    }()
+
 	http.HandleFunc("/rep", getReplicaStatus)
 	http.HandleFunc("/add", addServersEndpoint)
 	http.HandleFunc("/rm", removeServersEndpoint)
@@ -315,4 +343,7 @@ func main() {
 	if err := http.ListenAndServe(":5000", nil); err != nil {
 		log.Fatalf("Failed to start load balancer: %v", err)
 	}
+
+	// Waiting for cleanup to be done before exiting
+    <-cleanupDone
 }
