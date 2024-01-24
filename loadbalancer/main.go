@@ -190,19 +190,28 @@ func chooseRandomServer() string {
 }
 
 func removeServerInstance(hostname string) {
-	var serverID int
-	for id, info := range servers {
-		if info.Hostname == hostname {
-			serverID = id
-			break
-		}
-	}
+    cmd := exec.Command("sudo", "docker", "stop", hostname)
+    err := cmd.Run()
+    if err != nil {
+        log.Fatalf("Failed to stop server instance '%s': %v", hostname, err)
+    }
 
-	delete(servers, serverID)
+    cmd = exec.Command("sudo", "docker", "rm", hostname)
+    err = cmd.Run()
+    if err != nil {
+        log.Fatalf("Failed to remove server instance '%s': %v", hostname, err)
+    }
 
-	chm.RemoveServer(serverID)
+    var serverID int
+    for id, info := range servers {
+        if info.Hostname == hostname {
+            serverID = id
+            break
+        }
+    }
+    delete(servers, serverID)
+    chm.RemoveServer(serverID)
 }
-
 func removeServersEndpoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not supported", http.StatusMethodNotAllowed)
