@@ -10,7 +10,7 @@ async def fetch(session, url):
 
 
 async def main():
-    url = "http://localhost:3002/home"
+    url = "http://localhost:5000/home"
     tasks = []
 
     async with aiohttp.ClientSession() as session:

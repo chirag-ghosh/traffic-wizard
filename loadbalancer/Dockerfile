@@ -30,8 +30,8 @@ USER $USER
 # build
 RUN go build -o /lb/traffic-wizard-lb
 
-# the application is going to listen in the port 3002
-EXPOSE 3002
+# the application is going to listen in the port 5000
+EXPOSE 5000
 
 # run
 CMD ["/lb/traffic-wizard-lb"]

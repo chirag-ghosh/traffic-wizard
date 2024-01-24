@@ -19,7 +19,7 @@ import (
 
 const ServerDockerImageName = "traffix-wizard-server"
 const DockerNetworkName = "traffic-wizard-network"
-const ServerPort = 3002
+const ServerPort = 5000
 const N = 3
 
 func spawnNewServerInstance(hostname string, id int) {
@@ -426,9 +426,9 @@ func main() {
 	}
 	go monitorServers()
 
-	fmt.Println("Load Balancer started on port 3002")
+	fmt.Println("Load Balancer started on port 5000")
 
-	if err := http.ListenAndServe(":3002", nil); err != nil {
+	if err := http.ListenAndServe(":5000", nil); err != nil {
 		log.Fatalf("Failed to start load balancer: %v", err)
 	}
 
