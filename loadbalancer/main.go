@@ -10,11 +10,15 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"time"
 	"os/signal"
-    	"syscall"
+	"syscall"
+	"time"
+
 	"github.com/chirag-ghosh/traffic-wizard/loadbalancer/internal/consistenthashmap"
 )
+
+const ServerDockerImageName = "traffix-wizard-server"
+const DockerNetworkName = "traffic-wizard-network"
 
 func spawnNewServerInstance(hostname string, id int) {
 
@@ -24,16 +28,15 @@ func spawnNewServerInstance(hostname string, id int) {
 	}
 	fmt.Println("Current working directory:", dir)
 
-	cmd := exec.Command("sudo", "docker", "build", "--tag", "traffic-wizard-server", "/server")
+	cmd := exec.Command("sudo", "docker", "build", "--tag", ServerDockerImageName, "/server")
 	err = cmd.Run()
 	if err != nil {
 		log.Fatalf("Failed to build server image: %v", err)
 	}
 
 	// Run the server Docker container
-	cmd = exec.Command("sudo", "docker", "run", "-d", "--name", hostname, "-e", fmt.Sprintf("ID=%d", id), "traffic-wizard-server:latest")
-
-	// cmd = exec.Command("docker", "run", "-d", "--name", hostname, "traffic-wizard-server:latest")
+	cmd = exec.Command("sudo", "docker", "run", "-d", "--name", hostname, "--network", DockerNetworkName, "-e", fmt.Sprintf("ID=%d", id), fmt.Sprintf("%s:latest", ServerDockerImageName))
+	fmt.Println(cmd)
 	err = cmd.Run()
 	if err != nil {
 		log.Fatalf("Failed to start new server instance: %v", err)
@@ -190,27 +193,27 @@ func chooseRandomServer() string {
 }
 
 func removeServerInstance(hostname string) {
-    cmd := exec.Command("sudo", "docker", "stop", hostname)
-    err := cmd.Run()
-    if err != nil {
-        log.Fatalf("Failed to stop server instance '%s': %v", hostname, err)
-    }
+	cmd := exec.Command("sudo", "docker", "stop", hostname)
+	err := cmd.Run()
+	if err != nil {
+		log.Fatalf("Failed to stop server instance '%s': %v", hostname, err)
+	}
 
-    cmd = exec.Command("sudo", "docker", "rm", hostname)
-    err = cmd.Run()
-    if err != nil {
-        log.Fatalf("Failed to remove server instance '%s': %v", hostname, err)
-    }
+	cmd = exec.Command("sudo", "docker", "rm", hostname)
+	err = cmd.Run()
+	if err != nil {
+		log.Fatalf("Failed to remove server instance '%s': %v", hostname, err)
+	}
 
-    var serverID int
-    for id, info := range servers {
-        if info.Hostname == hostname {
-            serverID = id
-            break
-        }
-    }
-    delete(servers, serverID)
-    chm.RemoveServer(serverID)
+	var serverID int
+	for id, info := range servers {
+		if info.Hostname == hostname {
+			serverID = id
+			break
+		}
+	}
+	delete(servers, serverID)
+	chm.RemoveServer(serverID)
 }
 func removeServersEndpoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
@@ -307,32 +310,32 @@ func routeRequest(w http.ResponseWriter, r *http.Request) {
 
 // cleanupServers stops and removes all server containers
 func cleanupServers() {
-    fmt.Println("Cleaning up server instances...")
-    for _, server := range servers {
-        stopCmd := exec.Command("sudo", "docker", "stop", server.Hostname)
-        removeCmd := exec.Command("sudo", "docker", "rm", server.Hostname)
+	fmt.Println("Cleaning up server instances...")
+	for _, server := range servers {
+		stopCmd := exec.Command("sudo", "docker", "stop", server.Hostname)
+		removeCmd := exec.Command("sudo", "docker", "rm", server.Hostname)
 
-        if err := stopCmd.Run(); err != nil {
-            fmt.Println("Failed to stop server '%s': %v", server.Hostname, err)
-        }
-        if err := removeCmd.Run(); err != nil {
-            fmt.Println("Failed to remove server '%s': %v", server.Hostname, err)
-        }
-    }
+		if err := stopCmd.Run(); err != nil {
+			fmt.Printf("Failed to stop server '%s': %v", server.Hostname, err)
+		}
+		if err := removeCmd.Run(); err != nil {
+			fmt.Printf("Failed to remove server '%s': %v", server.Hostname, err)
+		}
+	}
 }
 
 func main() {
 	// a channel to listen to OS signal - ctrl+C to exit
-    sigs := make(chan os.Signal, 1)
-    cleanupDone := make(chan bool)
+	sigs := make(chan os.Signal, 1)
+	cleanupDone := make(chan bool)
 
-    signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-    go func() {
-        <-sigs // termination signal
-        cleanupServers() 
-        cleanupDone <- true // Signal that cleanup is done
-    }()
+	go func() {
+		<-sigs // termination signal
+		cleanupServers()
+		cleanupDone <- true // Signal that cleanup is done
+	}()
 
 	http.HandleFunc("/rep", getReplicaStatus)
 	http.HandleFunc("/add", addServersEndpoint)
@@ -345,5 +348,5 @@ func main() {
 	}
 
 	// Waiting for cleanup to be done before exiting
-    <-cleanupDone
+	<-cleanupDone
 }

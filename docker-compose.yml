@@ -1,5 +1,10 @@
 version: "3"
 
+networks:
+  traffic-wizard-network:
+    name: traffic-wizard-network
+    driver: bridge
+
 services:
   loadbalancer:
     build: "./loadbalancer"
@@ -12,7 +17,3 @@ services:
     privileged: true
     networks:
       - traffic-wizard-network
-
-networks:
-  traffic-wizard-network:
-    driver: bridge
