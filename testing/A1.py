@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
 import matplotlib.pyplot as plt
+import json
 
 
 async def fetch(session, url):
@@ -9,11 +10,11 @@ async def fetch(session, url):
 
 
 async def main():
-    url = "http://localhost:3002/home"  # Load balancer URL
+    url = "http://localhost:3002/home"
     tasks = []
 
     async with aiohttp.ClientSession() as session:
-        for _ in range(10000):  # 10,000 requests
+        for _ in range(10):  # 10,000 requests
             task = asyncio.ensure_future(fetch(session, url))
             tasks.append(task)
 
@@ -22,13 +23,13 @@ async def main():
         # Count responses from each server
         server_count = {}
         for response in responses:
-            server_count[response] = server_count.get(response, 0) + 1
+            # Parse the server ID from the response
+            server_id = json.loads(response)["message"].split(": ")[1]
+            server_count[server_id] = server_count.get(server_id, 0) + 1
 
         # Plotting the results
         servers = list(server_count.keys())
         counts = list(server_count.values())
-        print(servers)
-        print(counts)
 
         plt.bar(servers, counts)
         plt.xlabel("Servers")
@@ -37,5 +38,4 @@ async def main():
         plt.savefig("/images/A1.png")
 
 
-# Run the async main function
 asyncio.run(main())

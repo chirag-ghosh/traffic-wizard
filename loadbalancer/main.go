@@ -111,6 +111,8 @@ func addRandomServers(n int) {
 		spawnNewServerInstance(hostname, serverID)
 
 		servers[serverID] = ServerInfo{ID: serverID, Hostname: hostname}
+		serverDown := make(chan int)
+		go checkHeartbeat(servers[serverID], serverDown)
 	}
 }
 
@@ -157,6 +159,9 @@ func addServersEndpoint(w http.ResponseWriter, r *http.Request) {
 		spawnNewServerInstance(hostname, serverID)
 
 		servers[serverID] = ServerInfo{ID: serverID, Hostname: hostname}
+		serverDown := make(chan int)
+		go checkHeartbeat(servers[serverID], serverDown)
+		
 
 		if i+1 == payload.N {
 			break
@@ -208,12 +213,11 @@ func removeServerInstance(hostname string) {
 	flag := false
 	for _, serverInfo := range servers {
 		if serverInfo.Hostname == hostname {
-			fmt.Printf("Hostname: '%s' not present", hostname)
 			flag = true
 			break
 		}
 	}
-	if flag == false {
+	if !flag {
 		return
 	}
 
@@ -315,7 +319,7 @@ func routeRequest(w http.ResponseWriter, r *http.Request) {
 
 	server, exists := servers[serverID]
 	if !exists {
-		fmt.Println(serverID, servers)
+		
 		responseError(w, "<Error> Server not found", http.StatusNotFound)
 		return
 	}
@@ -341,6 +345,44 @@ func routeRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(body)
+}
+
+func checkHeartbeat(server ServerInfo, serverDown chan<- int) {
+    for {
+		if _, exists := servers[server.ID]; !exists {
+			return
+		}
+		serverIP := getServerIP(server.Hostname)
+		resp, err := http.Get("http://" + getServerIP(server.Hostname) + ":" + fmt.Sprint(ServerPort) + "/heartbeat")
+        if len(serverIP) == 0 || err != nil || resp.StatusCode != http.StatusOK {
+            fmt.Printf("Server %s is down!\n", server.Hostname)
+            serverDown <- server.ID
+            return
+        }
+
+        time.Sleep(5 * time.Second)
+    }
+}
+
+func monitorServers() {
+    serverDown := make(chan int)
+
+    // monitoring heartbeat of each server
+    for _, server := range servers {
+        go checkHeartbeat(server, serverDown)
+    }
+
+    for {
+        downServerID := <-serverDown
+		downServer := servers[downServerID]
+		delete(servers, downServerID)
+		newServerID := getNextServerID()
+		newServerHostname := fmt.Sprintf("autohost-%d", newServerID)
+        fmt.Printf("Restarting server %s as %s\n", downServer.Hostname, newServerHostname)
+        spawnNewServerInstance(newServerHostname, newServerID)
+		servers[newServerID] = ServerInfo{ID: newServerID, Hostname: newServerHostname}
+		go checkHeartbeat(servers[newServerID], serverDown)
+    }
 }
 
 // cleanupServers stops and removes all server containers
@@ -373,7 +415,6 @@ func main() {
 	}()
 
 	http.HandleFunc("/rep", getReplicaStatus)
-
 	http.HandleFunc("/add", addServersEndpoint)
 	http.HandleFunc("/rm", removeServersEndpoint)
 	http.HandleFunc("/", routeRequest)
@@ -383,6 +424,8 @@ func main() {
 		addRandomServers(N)
 		fmt.Println("Spawned ", N, " server replicas")
 	}
+	go monitorServers()
+
 	fmt.Println("Load Balancer started on port 3002")
 
 	if err := http.ListenAndServe(":3002", nil); err != nil {
