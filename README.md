@@ -97,7 +97,7 @@ The results are visually represented in a series of line charts depicting the av
 3. **Hash Function Impact**: The graphs illustrate some level of inconsistency in load distribution, which can be attributed to the nature of the hash functions used. The average load per server does not decrease linearly with the addition of more servers, indicating potential inefficiencies in the hash function:
    ```go
    func hashRequest(i int) int {
-       return i
+       return i*i + 2*i + 17
    }
 
    func hashVirtualServer(i, j int) int {
